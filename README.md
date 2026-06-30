@@ -22,9 +22,9 @@
 | GitHub | [github.com](https://github.com) | fork 这个模板，保存你自己的代码副本 |
 | Supabase | [supabase.com](https://supabase.com) | 保存账本数据，发送登录验证码 |
 | Cloudflare | [dash.cloudflare.com](https://dash.cloudflare.com) | 部署网页，让手机和电脑都能访问 |
-| Gmail / Google 账号 | [myaccount.google.com](https://myaccount.google.com) | 可选：用自己的 Gmail SMTP 发送验证码 |
+| Gmail / Google 账号 | [myaccount.google.com](https://myaccount.google.com) | 用自己的 Gmail SMTP 发送验证码 |
 
-GitHub、Supabase、Cloudflare 都可以先用免费档。Gmail SMTP 不是必须；Supabase 自带邮件可以先测试，但正式给家人用时建议配置自己的发信服务，否则可能遇到发送频率限制或邮件送达不稳定。
+GitHub、Supabase、Cloudflare 都可以先用免费档。关键点：Supabase 免费项目可以用，但不要依赖 Supabase 默认发信服务做验证码登录。Supabase 官方说明内置邮件服务主要用于演示，发送限制很低且可用性是 best-effort；这个账本要给家人稳定使用，应配置 Gmail SMTP 或其他自定义 SMTP。
 
 官方文档参考：
 
@@ -247,11 +247,11 @@ http://localhost:5173
 
 为什么不用点击链接：iPhone 加到主屏幕后，点击邮件里的 magic link 可能打开 Safari，而不是回到桌面 App 窗口。输入验证码更稳定，家人也更容易理解。
 
-### 4. 可选：用 Gmail 发送验证码
+### 4. 配置 Gmail 发送验证码
 
-可以先跳过这一步，用 Supabase 默认邮件测试。如果验证码收不到、进垃圾箱，或以后家人使用频率变高，再配置自定义 SMTP。
+这一步不要跳过。Supabase 默认邮件服务只适合临时演示，免费项目的内置发信限制太低，家人一登录或多试几次就可能遇到验证码发不出来。实际使用请配置 Gmail SMTP。
 
-如果要用 Gmail：
+配置 Gmail：
 
 1. 打开 [Google Account Security](https://myaccount.google.com/security)。
 2. 开启 2-Step Verification。
@@ -272,8 +272,10 @@ Sender name: 家庭账本
 注意：
 
 - App Password 只显示一次，保存到你的密码管理器，不要提交到 GitHub。
+- 这里用的是 Google App Password，不是你的 Gmail 登录密码。
 - Gmail 更适合小范围家庭使用。多人频繁登录时，Resend、Postmark、SendGrid、Mailgun 这类事务邮件服务更稳。
 - 如果发送失败，先看 Supabase 的 Auth logs，再检查 Gmail 是否开启了 2-Step Verification 和 App Password。
+- 配好 SMTP 后，去 Supabase 的 `Authentication` -> `Rate Limits` 检查邮件/OTP 发送限制。自定义 SMTP 才能把限制调到适合自己家庭使用的范围。
 
 ### 5. 找到 Supabase URL 和 anon key
 
@@ -618,7 +620,9 @@ npm run build
 2. 邮箱是否输错。
 3. Supabase `Authentication` -> `Logs`。
 4. Email template 是否包含 `{{ .Token }}`。
-5. 如果用 Gmail SMTP，检查 2-Step Verification、App Password、SMTP host/port。
+5. 是否已经配置 Custom SMTP。不要依赖 Supabase 默认发信服务。
+6. 如果用 Gmail SMTP，检查 2-Step Verification、App Password、SMTP host/port。
+7. Supabase `Authentication` -> `Rate Limits` 是否过低。
 
 ### 运行 SQL 报错
 

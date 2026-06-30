@@ -33,6 +33,7 @@ Record corrections that should change future behavior in this project.
 | --- | --- | --- |
 | 2026-06-30 | Node.js setup docs should distinguish macOS and Windows and include command-line installation options. | When documenting first-time setup, provide OS-specific GUI and CLI paths instead of one generic install sentence. |
 | 2026-06-30 | Cloudflare docs need a first-time setup path, not only `wrangler login` and deploy. | Explain Cloudflare account setup, Wrangler authorization, workers.dev subdomain, Worker naming, first deploy checks, redeploys, and optional custom domains. |
+| 2026-06-30 | Supabase default email sending should not be documented as enough for real OTP login on the free setup. | Treat custom SMTP, typically Gmail SMTP for this family template, as required for stable验证码登录; clarify that the Supabase project can be free but default email should not be relied on. |
 
 ## External Resources
 
