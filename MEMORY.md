@@ -32,6 +32,7 @@ Record corrections that should change future behavior in this project.
 | Date | Correction | Future behavior |
 | --- | --- | --- |
 | 2026-06-30 | Node.js setup docs should distinguish macOS and Windows and include command-line installation options. | When documenting first-time setup, provide OS-specific GUI and CLI paths instead of one generic install sentence. |
+| 2026-06-30 | Cloudflare docs need a first-time setup path, not only `wrangler login` and deploy. | Explain Cloudflare account setup, Wrangler authorization, workers.dev subdomain, Worker naming, first deploy checks, redeploys, and optional custom domains. |
 
 ## External Resources
 
