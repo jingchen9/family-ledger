@@ -1,0 +1,396 @@
+import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useLedger } from "../context/LedgerContext";
+import { todayIso } from "../lib/date";
+import { cleanDecimalInput, parseDecimalInput } from "../lib/numberInput";
+import type { BusinessType, Currency, TransactionInput } from "../types";
+
+interface MigrationRow {
+  migration_id: string;
+  date: string;
+  direction: "income" | "expense";
+  category_name: string;
+  original_category: string;
+  amount: number;
+  currency: Currency | null;
+  detail: string;
+  business_type: BusinessType;
+  payer_account: string | null;
+  is_fixed: boolean;
+  is_cash_transaction: boolean;
+  allocation_start_month: string | null;
+  allocation_months: number | null;
+  source_sheet: string;
+  source_cell: string;
+  migration_status: "auto" | "review";
+}
+
+interface MigrationBundle {
+  version: number;
+  transactions: MigrationRow[];
+}
+
+function csvCell(value: string | number | null): string {
+  const text = value === null ? "" : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function download(name: string, content: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function migrationCategoryName(row: MigrationRow): string {
+  if (row.direction !== "income") return row.category_name;
+  return row.category_name || "收入";
+}
+
+export function SettingsPage() {
+  const {
+    categories,
+    transactions,
+    exchangeRates,
+    addCategory,
+    addExchangeRate,
+    importTransactions,
+    mode,
+    busy,
+    households,
+    householdMembers,
+    householdInvites,
+    householdId,
+    selectHousehold,
+    inviteHouseholdMember,
+    renameHousehold,
+    deleteHousehold,
+    updateHouseholdMemberName,
+  } = useLedger();
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryDirection, setCategoryDirection] = useState<"income" | "expense">("expense");
+  const [rateDate, setRateDate] = useState(todayIso());
+  const [rateValue, setRateValue] = useState("");
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  const currentHousehold = households.find((household) => household.id === householdId);
+  const canManageHousehold = mode === "supabase" && currentHousehold?.role === "owner";
+  const deletableHouseholds = households.filter(
+    (household) => household.role === "owner" && household.transactionCount === 0 && households.length > 1,
+  );
+
+  async function submitCategory(event: FormEvent) {
+    event.preventDefault();
+    if (!categoryName.trim()) return;
+    await addCategory({ name: categoryName.trim(), direction: categoryDirection, color: "#56876d" });
+    setCategoryName("");
+  }
+
+  async function submitRate(event: FormEvent) {
+    event.preventDefault();
+    const unitsPerEur = parseDecimalInput(rateValue);
+    if (!Number.isFinite(unitsPerEur) || unitsPerEur <= 0) return;
+    await addExchangeRate({
+      effectiveDate: rateDate,
+      currency: "CNY" as Exclude<Currency, "EUR">,
+      unitsPerEur,
+      source: "手工录入",
+    });
+    setRateValue("");
+  }
+
+  async function submitInvite(event: FormEvent) {
+    event.preventDefault();
+    const email = inviteEmail.trim();
+    if (!email) return;
+    await inviteHouseholdMember(email);
+    setInviteEmail("");
+  }
+
+  async function submitHouseholdName(event: FormEvent) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget as HTMLFormElement);
+    const nextName = String(form.get("householdName") ?? "");
+    const name = nextName.trim();
+    if (!name || name === currentHousehold?.name) return;
+    await renameHousehold(name);
+  }
+
+  async function submitMemberName(event: FormEvent, userId: string) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget as HTMLFormElement);
+    await updateHouseholdMemberName(userId, String(form.get("displayName") ?? "").trim());
+  }
+
+  async function deleteEmptySelectedHousehold(targetHouseholdId: string, targetName: string) {
+    if (!window.confirm(`删除空账本“${targetName}”？这个操作只会删除 0 笔记录的账本。`)) return;
+    await deleteHousehold(targetHouseholdId);
+  }
+
+  function exportCsv() {
+    const header = ["日期", "收支", "类别", "金额", "币种", "可选EUR折算", "明细", "是否现金流水", "是否固定", "均摊开始", "均摊月数", "付款人/账户", "来源"];
+    const rows = transactions.map((item) => [
+      item.date,
+      item.direction,
+      categories.find((category) => category.id === item.categoryId)?.name ?? "",
+      item.amount,
+      item.currency,
+      item.eurAmount,
+      item.detail,
+      item.isCashTransaction ? "是" : "否",
+      item.isFixed ? "是" : "否",
+      item.allocationStartMonth,
+      item.allocationMonths,
+      item.payerAccount,
+      item.sourceSheet && item.sourceCell ? `${item.sourceSheet}!${item.sourceCell}` : "",
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+    download(`家庭账本-${todayIso()}.csv`, `\ufeff${csv}`, "text/csv;charset=utf-8");
+  }
+
+  async function importMigration(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setImportStatus("正在检查迁移包…");
+    try {
+      const parsed = JSON.parse(await file.text()) as MigrationBundle;
+      if (parsed.version !== 1 || !Array.isArray(parsed.transactions)) {
+        throw new Error("这不是受支持的迁移包");
+      }
+      let skipped = 0;
+      const inputs: TransactionInput[] = [];
+      for (const row of parsed.transactions) {
+        if (row.migration_status !== "auto" || !row.currency) {
+          skipped += 1;
+          continue;
+        }
+        const categoryName = migrationCategoryName(row);
+        const category = categories.find((item) => item.direction === row.direction && item.name === categoryName);
+        if (!category || !row.migration_id || !row.date || !(row.amount > 0)) {
+          skipped += 1;
+          continue;
+        }
+        inputs.push({
+          date: row.date,
+          direction: row.direction,
+          categoryId: category.id,
+          amount: row.amount,
+          currency: row.currency,
+          detail: row.detail ?? "",
+          businessType: row.business_type ?? "daily",
+          isCashTransaction: row.is_cash_transaction,
+          isFixed: row.is_fixed,
+          allocationStartMonth: row.allocation_start_month,
+          allocationMonths: row.allocation_months,
+          payerAccount: row.payer_account,
+          migrationId: row.migration_id,
+          sourceSheet: row.source_sheet,
+          sourceCell: row.source_cell,
+          originalCategory: row.original_category,
+          migrationStatus: "auto",
+        });
+      }
+      const imported = await importTransactions(inputs);
+      setImportStatus(`导入完成：新增 ${imported} 笔，跳过 ${skipped} 笔待复核记录；重复记录自动忽略。`);
+    } catch (error) {
+      setImportStatus(error instanceof Error ? `导入失败：${error.message}` : "导入失败：文件格式不正确");
+    }
+  }
+
+  function exportBackup() {
+    download(
+      `家庭账本备份-${todayIso()}.json`,
+      JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), categories, exchangeRates, transactions }, null, 2),
+      "application/json",
+    );
+  }
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <p className="eyebrow">设置与数据</p>
+        <h1>低频的事，放在这里</h1>
+        <p>当前数据模式：{mode === "local" ? "本机试用" : "家庭云端"}</p>
+      </header>
+
+      <div className="settings-grid">
+        {mode === "supabase" && (
+          <section className="surface settings-card backup-card">
+            <div className="section-title"><h2>当前账本</h2><span>{households.length} 个可用账本</span></div>
+            <p>切换后，明细、分析和导入都会写入所选家庭账本。</p>
+            {households.length > 1 && (
+              <select value={householdId ?? ""} onChange={(event) => selectHousehold(event.target.value)}>
+                {households.map((household) => (
+                  <option key={household.id} value={household.id}>
+                    {household.name} · {household.transactionCount} 笔
+                  </option>
+                ))}
+              </select>
+            )}
+            {canManageHousehold && (
+              <form onSubmit={submitHouseholdName} className="inline-form account-name-form">
+                <input
+                  key={currentHousehold.id}
+                  name="householdName"
+                  defaultValue={currentHousehold.name}
+                  placeholder="账本名称"
+                  required
+                />
+                <button className="secondary-button" disabled={busy}>
+                  保存名称
+                </button>
+              </form>
+            )}
+            {deletableHouseholds.length > 0 && (
+              <div className="compact-list danger-list">
+                {deletableHouseholds.map((household) => (
+                  <div key={household.id}>
+                    <span>{household.name} · 0 笔</span>
+                    <button
+                      type="button"
+                      className="ghost-button danger-button"
+                      disabled={busy}
+                      onClick={() => void deleteEmptySelectedHousehold(household.id, household.name)}
+                    >
+                      删除空账本
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {mode === "supabase" && (
+          <section className="surface settings-card backup-card">
+            <div className="section-title">
+              <h2>家庭成员</h2>
+              <span>{householdMembers.length} 人</span>
+            </div>
+            <p>同一个家庭账本由成员关系控制。家人使用自己的邮箱登录，不需要共享账号。</p>
+            {canManageHousehold && (
+              <form onSubmit={submitInvite} className="inline-form">
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                  placeholder="家人的邮箱"
+                  required
+                />
+                <button className="secondary-button" disabled={busy}>邀请</button>
+              </form>
+            )}
+            <div className="compact-list member-list">
+              {householdMembers.map((member) => (
+                <div key={member.userId}>
+                  <span>
+                    <strong>
+                      {member.displayName && member.displayName !== member.email
+                        ? member.displayName
+                        : member.email || "家庭成员"}
+                    </strong>
+                    {member.displayName && member.displayName !== member.email && member.email && <small>{member.email}</small>}
+                  </span>
+                  <strong>{member.role === "owner" ? "所有者" : "成员"}</strong>
+                </div>
+              ))}
+              {householdMembers.length === 0 && <p className="muted">成员列表会在云端账本加载后显示。</p>}
+            </div>
+            {canManageHousehold && householdMembers.length > 0 && (
+              <div className="member-edit-list">
+                {householdMembers.map((member) => (
+                  <form key={member.userId} onSubmit={(event) => void submitMemberName(event, member.userId)} className="inline-form member-name-form">
+                    <input
+                      key={`${member.userId}:${member.displayName}`}
+                      name="displayName"
+                      defaultValue={member.displayName}
+                      placeholder={member.email || "成员名称"}
+                    />
+                    <button className="secondary-button" disabled={busy}>
+                      保存名称
+                    </button>
+                  </form>
+                ))}
+              </div>
+            )}
+            {canManageHousehold && householdInvites.length > 0 && (
+              <>
+                <p className="muted">等待对方登录接受：</p>
+                <div className="compact-list member-list">
+                  {householdInvites.map((invite) => (
+                    <div key={invite.id}>
+                      <span>{invite.email}</span>
+                      <strong>待加入</strong>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        <section className="surface settings-card">
+          <div className="section-title"><h2>可选折算汇率</h2><span>1 EUR = ? CNY</span></div>
+          <p>CNY 原币统计不需要汇率。折算 EUR 会使用最新一条汇率作为报表汇率，不按每笔交易日期变化。</p>
+          <form onSubmit={submitRate} className="inline-form">
+            <input type="date" value={rateDate} onChange={(event) => setRateDate(event.target.value)} required />
+            <input
+              type="text"
+              inputMode="decimal"
+              value={rateValue}
+              onChange={(event) => setRateValue(cleanDecimalInput(event.target.value))}
+              placeholder="例如 7.8500"
+              required
+            />
+            <button className="secondary-button" disabled={busy}>添加</button>
+          </form>
+          <div className="compact-list">
+            {exchangeRates.slice(0, 5).map((rate) => (
+              <div key={rate.id}><span>{rate.effectiveDate}</span><strong>{rate.unitsPerEur.toFixed(4)}</strong></div>
+            ))}
+            {exchangeRates.length === 0 && <p className="muted">尚未添加汇率。EUR、CNY 原币统计都不受影响。</p>}
+          </div>
+        </section>
+
+        <section className="surface settings-card">
+          <div className="section-title"><h2>新增类别</h2><span>{categories.length} 个类别</span></div>
+          <form onSubmit={submitCategory} className="inline-form">
+            <select value={categoryDirection} onChange={(event) => setCategoryDirection(event.target.value as "income" | "expense")}>
+              <option value="expense">支出</option>
+              <option value="income">收入</option>
+            </select>
+            <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="类别名称" required />
+            <button className="secondary-button" disabled={busy}>添加</button>
+          </form>
+          <div className="category-chips">
+            {categories.filter((item) => item.direction === categoryDirection).map((category) => (
+              <span key={category.id}><i style={{ background: category.color }} />{category.name}</span>
+            ))}
+          </div>
+        </section>
+
+        <section className="surface settings-card backup-card">
+          <div className="section-title"><h2>带走自己的数据</h2><span>{transactions.length} 笔记录</span></div>
+          <p>CSV 用于 Excel 查看；JSON 是包含设置与汇率的完整备份。</p>
+          <div className="button-row">
+            <button className="secondary-button" onClick={exportCsv}>导出 CSV</button>
+            <button className="ghost-button" onClick={exportBackup}>完整备份</button>
+          </div>
+        </section>
+
+        <section className="surface settings-card backup-card">
+          <div className="section-title"><h2>导入旧账本</h2><span>第二阶段</span></div>
+          <p>选择脚本生成的 <code>migration_bundle.json</code>。只导入币种、日期和类别已明确的记录，待复核项留在审核清单。</p>
+          <label className="secondary-button file-button">
+            选择迁移包
+            <input type="file" accept="application/json,.json" onChange={importMigration} disabled={busy} />
+          </label>
+          {importStatus && <p className="muted">{importStatus}</p>}
+        </section>
+      </div>
+    </div>
+  );
+}
