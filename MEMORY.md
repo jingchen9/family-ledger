@@ -31,6 +31,7 @@ Record corrections that should change future behavior in this project.
 
 | Date | Correction | Future behavior |
 | --- | --- | --- |
+| 2026-06-30 | Node.js setup docs should distinguish macOS and Windows and include command-line installation options. | When documenting first-time setup, provide OS-specific GUI and CLI paths instead of one generic install sentence. |
 
 ## External Resources
 

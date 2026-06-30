@@ -69,16 +69,54 @@ cd YOUR-REPO
 
 ### 3. 安装 Node.js
 
-安装 Node.js LTS：[nodejs.org](https://nodejs.org/)
+Node.js 是本地运行和部署这个账本需要的工具。家人只打开 Cloudflare 网址使用时不需要安装；只有负责配置、部署、更新的人需要装。
 
-装完后打开终端检查：
+最稳妥的方式是去 [nodejs.org](https://nodejs.org/) 下载 `LTS` 版本安装包。安装完后关闭终端，再重新打开一次。
+
+#### Mac 安装
+
+不会命令行：打开 [nodejs.org](https://nodejs.org/)，下载 macOS 的 `LTS` 安装包，一路下一步安装。
+
+会命令行，并且已经装了 Homebrew：
+
+```bash
+brew install node
+```
+
+如果 Mac 还没有 Homebrew，先安装 Homebrew：
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+然后再运行：
+
+```bash
+brew install node
+```
+
+#### Windows 安装
+
+不会命令行：打开 [nodejs.org](https://nodejs.org/)，下载 Windows 的 `LTS` 安装包，一路下一步安装。
+
+会命令行：用管理员身份打开 PowerShell 或 Windows Terminal，运行：
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+如果提示找不到 `winget`，先从 Microsoft Store 更新或安装 `App Installer`，然后重新打开 PowerShell。
+
+#### 检查是否安装成功
+
+Mac 打开 Terminal，Windows 打开 PowerShell，运行：
 
 ```bash
 node -v
 npm -v
 ```
 
-能显示版本号就可以继续。
+能显示版本号就可以继续。如果刚安装完还显示找不到命令，先关闭终端窗口再重新打开。
 
 ## 本机试用模式
 
