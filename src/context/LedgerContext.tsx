@@ -59,6 +59,8 @@ interface LedgerContextValue {
   updateTransaction(id: string, input: TransactionInput): Promise<void>;
   deleteTransaction(id: string): Promise<void>;
   addCategory(input: Pick<Category, "name" | "direction" | "color">): Promise<void>;
+  updateCategory(id: string, input: Pick<Category, "name" | "color" | "active">): Promise<void>;
+  deleteCategory(id: string): Promise<void>;
   addExchangeRate(input: Omit<ExchangeRate, "id">): Promise<void>;
 }
 
@@ -313,6 +315,21 @@ export function LedgerProvider({ children }: { children: ReactNode }) {
         const snapshot = await store.load();
         setCategories(snapshot.categories);
         setMessage("类别已添加");
+      },
+      updateCategory: async (id, input) => {
+        if (!store) return;
+        await run(() => store.updateCategory(id, input));
+        const snapshot = await store.load();
+        setCategories(snapshot.categories);
+        setTransactions(snapshot.transactions);
+        setMessage("类别已保存");
+      },
+      deleteCategory: async (id) => {
+        if (!store) return;
+        await run(() => store.deleteCategory(id));
+        const snapshot = await store.load();
+        setCategories(snapshot.categories);
+        setMessage("类别已删除");
       },
       addExchangeRate: async (input) => {
         if (!store) return;

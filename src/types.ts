@@ -78,6 +78,12 @@ export interface TransactionInput {
   migrationStatus?: "auto" | "review" | "manual";
 }
 
+export interface CategoryUpdateInput {
+  name: string;
+  color: string;
+  active: boolean;
+}
+
 export interface LedgerSnapshot {
   categories: Category[];
   transactions: LedgerTransaction[];
@@ -114,5 +120,7 @@ export interface LedgerStore {
   updateTransaction(id: string, input: TransactionInput): Promise<LedgerTransaction>;
   deleteTransaction(id: string): Promise<void>;
   addCategory(input: Pick<Category, "name" | "direction" | "color">): Promise<Category>;
+  updateCategory(id: string, input: CategoryUpdateInput): Promise<Category>;
+  deleteCategory(id: string): Promise<void>;
   addExchangeRate(input: Omit<ExchangeRate, "id">): Promise<ExchangeRate>;
 }

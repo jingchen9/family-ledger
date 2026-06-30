@@ -1,8 +1,8 @@
-import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useLedger } from "../context/LedgerContext";
 import { todayIso } from "../lib/date";
 import { cleanDecimalInput, parseDecimalInput } from "../lib/numberInput";
-import type { BusinessType, Currency, TransactionInput } from "../types";
+import type { BusinessType, Category, Currency, TransactionInput } from "../types";
 
 interface MigrationRow {
   migration_id: string;
@@ -54,6 +54,8 @@ export function SettingsPage() {
     transactions,
     exchangeRates,
     addCategory,
+    updateCategory,
+    deleteCategory,
     addExchangeRate,
     importTransactions,
     mode,
@@ -70,6 +72,10 @@ export function SettingsPage() {
   } = useLedger();
   const [categoryName, setCategoryName] = useState("");
   const [categoryDirection, setCategoryDirection] = useState<"income" | "expense">("expense");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryColor, setEditingCategoryColor] = useState("#56876d");
+  const [editingCategoryActive, setEditingCategoryActive] = useState(true);
   const [rateDate, setRateDate] = useState(todayIso());
   const [rateValue, setRateValue] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -80,12 +86,55 @@ export function SettingsPage() {
   const deletableHouseholds = households.filter(
     (household) => household.role === "owner" && household.transactionCount === 0 && households.length > 1,
   );
+  const visibleCategories = categories
+    .filter((item) => item.direction === categoryDirection)
+    .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name));
+  const categoryUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const transaction of transactions) {
+      counts.set(transaction.categoryId, (counts.get(transaction.categoryId) ?? 0) + 1);
+    }
+    return counts;
+  }, [transactions]);
 
   async function submitCategory(event: FormEvent) {
     event.preventDefault();
     if (!categoryName.trim()) return;
     await addCategory({ name: categoryName.trim(), direction: categoryDirection, color: "#56876d" });
     setCategoryName("");
+  }
+
+  function startEditCategory(category: Category) {
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+    setEditingCategoryColor(category.color);
+    setEditingCategoryActive(category.active);
+  }
+
+  function cancelEditCategory() {
+    setEditingCategoryId(null);
+    setEditingCategoryName("");
+    setEditingCategoryColor("#56876d");
+    setEditingCategoryActive(true);
+  }
+
+  async function submitCategoryEdit(event: FormEvent) {
+    event.preventDefault();
+    if (!editingCategoryId || !editingCategoryName.trim()) return;
+    await updateCategory(editingCategoryId, {
+      name: editingCategoryName.trim(),
+      color: editingCategoryColor,
+      active: editingCategoryActive,
+    });
+    cancelEditCategory();
+  }
+
+  async function removeCategory(category: Category) {
+    const usageCount = categoryUsage.get(category.id) ?? 0;
+    if (usageCount > 0) return;
+    if (!window.confirm(`删除未使用类别“${category.name}”？`)) return;
+    await deleteCategory(category.id);
+    if (editingCategoryId === category.id) cancelEditCategory();
   }
 
   async function submitRate(event: FormEvent) {
@@ -356,7 +405,7 @@ export function SettingsPage() {
         </section>
 
         <section className="surface settings-card">
-          <div className="section-title"><h2>新增类别</h2><span>{categories.length} 个类别</span></div>
+          <div className="section-title"><h2>类别管理</h2><span>{categories.length} 个类别</span></div>
           <form onSubmit={submitCategory} className="inline-form">
             <select value={categoryDirection} onChange={(event) => setCategoryDirection(event.target.value as "income" | "expense")}>
               <option value="expense">支出</option>
@@ -365,10 +414,61 @@ export function SettingsPage() {
             <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="类别名称" required />
             <button className="secondary-button" disabled={busy}>添加</button>
           </form>
-          <div className="category-chips">
-            {categories.filter((item) => item.direction === categoryDirection).map((category) => (
-              <span key={category.id}><i style={{ background: category.color }} />{category.name}</span>
-            ))}
+          <div className="category-list">
+            {visibleCategories.map((category) => {
+              const usageCount = categoryUsage.get(category.id) ?? 0;
+              const editing = editingCategoryId === category.id;
+              return (
+                <div className="category-row" key={category.id}>
+                  {editing ? (
+                    <form className="category-edit-form" onSubmit={submitCategoryEdit}>
+                      <input
+                        type="color"
+                        value={editingCategoryColor}
+                        onChange={(event) => setEditingCategoryColor(event.target.value)}
+                        aria-label="类别颜色"
+                      />
+                      <input
+                        value={editingCategoryName}
+                        onChange={(event) => setEditingCategoryName(event.target.value)}
+                        required
+                      />
+                      <label className="checkbox-line">
+                        <input
+                          type="checkbox"
+                          checked={editingCategoryActive}
+                          onChange={(event) => setEditingCategoryActive(event.target.checked)}
+                        />
+                        新记账可选
+                      </label>
+                      <button className="secondary-button" disabled={busy}>保存</button>
+                      <button className="ghost-button" type="button" onClick={cancelEditCategory}>取消</button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="category-name">
+                        <i style={{ background: category.color }} />
+                        <strong>{category.name}</strong>
+                        {!category.active && <small>已停用</small>}
+                      </span>
+                      <span className="category-usage">
+                        {usageCount > 0 ? `已使用 ${usageCount} 笔` : "未使用"}
+                      </span>
+                      <div className="category-actions">
+                        <button className="ghost-button" type="button" onClick={() => startEditCategory(category)}>
+                          编辑
+                        </button>
+                        {usageCount === 0 ? (
+                          <button className="danger-button" type="button" onClick={() => removeCategory(category)}>
+                            删除
+                          </button>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 

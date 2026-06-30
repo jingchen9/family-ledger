@@ -2,6 +2,7 @@ import { defaultCategories } from "../data/defaultCategories";
 import { toEur } from "../lib/money";
 import type {
   Category,
+  CategoryUpdateInput,
   ExchangeRate,
   LedgerSnapshot,
   LedgerStore,
@@ -136,8 +137,14 @@ export class LocalLedgerStore implements LedgerStore {
 
   async addCategory(input: Pick<Category, "name" | "direction" | "color">): Promise<Category> {
     const snapshot = this.read();
+    const name = input.name.trim();
+    if (!name) throw new Error("类别名称不能为空");
+    if (snapshot.categories.some((item) => item.direction === input.direction && item.name === name)) {
+      throw new Error("同方向下已经有这个类别");
+    }
     const category: Category = {
       ...input,
+      name,
       id: crypto.randomUUID(),
       active: true,
       sortOrder: snapshot.categories.filter((item) => item.direction === input.direction).length,
@@ -145,6 +152,40 @@ export class LocalLedgerStore implements LedgerStore {
     snapshot.categories.push(category);
     this.write(snapshot);
     return category;
+  }
+
+  async updateCategory(id: string, input: CategoryUpdateInput): Promise<Category> {
+    const snapshot = this.read();
+    const index = snapshot.categories.findIndex((category) => category.id === id);
+    if (index < 0) throw new Error("没有找到这个类别");
+    const name = input.name.trim();
+    if (!name) throw new Error("类别名称不能为空");
+    const current = snapshot.categories[index];
+    if (
+      snapshot.categories.some(
+        (category) => category.id !== id && category.direction === current.direction && category.name === name,
+      )
+    ) {
+      throw new Error("同方向下已经有这个类别");
+    }
+    const updated: Category = {
+      ...current,
+      name,
+      color: input.color,
+      active: input.active,
+    };
+    snapshot.categories[index] = updated;
+    this.write(snapshot);
+    return updated;
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    const snapshot = this.read();
+    if (snapshot.transactions.some((transaction) => transaction.categoryId === id)) {
+      throw new Error("这个类别已有记录，不能删除；可以改名或停用");
+    }
+    snapshot.categories = snapshot.categories.filter((category) => category.id !== id);
+    this.write(snapshot);
   }
 
   async addExchangeRate(input: Omit<ExchangeRate, "id">): Promise<ExchangeRate> {

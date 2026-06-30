@@ -1,5 +1,6 @@
 import type {
   Category,
+  CategoryUpdateInput,
   ExchangeRate,
   LedgerSnapshot,
   LedgerStore,
@@ -361,13 +362,39 @@ export class SupabaseLedgerStore implements LedgerStore {
   }
 
   async addCategory(input: Pick<Category, "name" | "direction" | "color">): Promise<Category> {
+    const name = input.name.trim();
+    if (!name) throw new Error("类别名称不能为空");
     const { data, error } = await requireClient()
       .from("categories")
-      .insert({ household_id: this.householdId, ...input })
+      .insert({ household_id: this.householdId, ...input, name })
       .select()
       .single();
     if (error) throw error;
     return mapCategory(data);
+  }
+
+  async updateCategory(id: string, input: CategoryUpdateInput): Promise<Category> {
+    const name = input.name.trim();
+    if (!name) throw new Error("类别名称不能为空");
+    const { data, error } = await requireClient()
+      .from("categories")
+      .update({
+        name,
+        color: input.color,
+        active: input.active,
+      })
+      .eq("id", id)
+      .eq("household_id", this.householdId)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapCategory(data);
+  }
+
+  async deleteCategory(id: string): Promise<void> {
+    const { error } = await requireClient()
+      .rpc("delete_unused_category", { target_category_id: id });
+    if (error) throw error;
   }
 
   async addExchangeRate(input: Omit<ExchangeRate, "id">): Promise<ExchangeRate> {

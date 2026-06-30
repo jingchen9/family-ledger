@@ -44,6 +44,17 @@ npm run deploy
 The template starts with common household expense categories and one generic income category named `收入`.
 Add, rename, or deactivate categories in Settings for your own household.
 
+## Updating Your Fork
+
+If you forked this template, pull updates from the public template repository when a new version is published, then run:
+
+```bash
+npm install
+npm run build
+```
+
+Cloud users should also run any new SQL files in `supabase/migrations/` in filename order before using features that depend on new database functions.
+
 ## Private Data Safety
 
 Do not commit:
