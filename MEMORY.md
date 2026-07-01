@@ -39,6 +39,7 @@ Record corrections that should change future behavior in this project.
 | 2026-06-30 | Supabase default email sending should not be documented as enough for real OTP login on the free setup. | Treat custom SMTP, typically Gmail SMTP for this family template, as required for stable验证码登录; clarify that the Supabase project can be free but default email should not be relied on. |
 | 2026-07-01 | Supabase dashboard may not show a field literally named Project URL in the old location. | Tell users to find Project ID/Reference ID in Project Settings and construct `https://PROJECT_ID.supabase.co`, with Data API/API URL as an alternate location. |
 | 2026-07-01 | Avoid wording that says "Supabase sends the verification code" without mentioning Gmail/custom SMTP. | Describe the actual flow as Supabase Auth generates the code and Gmail/custom SMTP sends the email. |
+| 2026-07-01 | Cloudflare first setup should include verifying Wrangler login before deployment. | Document `npx wrangler login`, `npx wrangler whoami`, editing `wrangler.jsonc`, deploying, and finding the final URL in Workers & Pages. |
 
 ## External Resources
 

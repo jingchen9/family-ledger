@@ -384,13 +384,23 @@ http://localhost:5173
 ### 1. 注册并登录 Cloudflare
 
 1. 打开 [dash.cloudflare.com](https://dash.cloudflare.com)。
-2. 用邮箱注册或登录。
+2. 用邮箱或 Google 账号注册/登录。
 3. 如果 Cloudflare 询问用途，选择个人或 hobby 项目即可。
 4. 不需要先添加自己的域名；免费 `workers.dev` 地址已经够家庭使用。
 
 为什么先用 `workers.dev`：它不需要买域名、不需要改 DNS，第一次部署最少步骤。以后想换成 `ledger.yourdomain.com`，再配置自定义域名。
 
 ### 2. 在本地登录 Wrangler
+
+先进入项目根目录：
+
+```bash
+cd YOUR-REPO
+```
+
+把 `YOUR-REPO` 换成你下载后的项目文件夹。
+
+然后登录 Wrangler：
 
 ```bash
 npx wrangler login
@@ -403,6 +413,14 @@ npx wrangler login
 3. 回到终端，看到登录成功即可。
 
 如果浏览器没有自动打开，可以把终端里显示的链接复制到浏览器。
+
+确认 Wrangler 已经登录成功：
+
+```bash
+npx wrangler whoami
+```
+
+能看到你的 Cloudflare 账号信息，就可以继续部署。
 
 ### 3. 确认 workers.dev 子域名
 
@@ -435,13 +453,27 @@ WORKER-NAME.laoka-ledger.workers.dev
 
 ### 4. 修改 Worker 名称
 
-打开项目里的 `wrangler.jsonc`，把：
+打开项目里的 `wrangler.jsonc`。Windows 可以在项目根目录运行：
+
+```powershell
+notepad .\wrangler.jsonc
+```
+
+Mac 可以用自己常用的编辑器打开这个文件。
+
+找到：
 
 ```jsonc
 "name": "family-ledger-template"
 ```
 
-改成你自己的名字，例如：
+改成你自己的名字。最简单的做法是去掉 `-template`：
+
+```jsonc
+"name": "family-ledger"
+```
+
+也可以改成其他名字，例如：
 
 ```jsonc
 "name": "my-family-ledger"
@@ -473,6 +505,17 @@ npm run deploy
 
 ```text
 https://my-family-ledger.YOUR-SUBDOMAIN.workers.dev
+```
+
+也可以回到 Cloudflare 网页后台查看：
+
+1. 打开 `Workers & Pages`。
+2. 找到刚部署出来的 Worker。
+3. 页面里会显示这个 Worker 的 `workers.dev` 地址或 subdomain。
+4. 最终完整网址通常是：
+
+```text
+https://WORKER-NAME.YOUR-SUBDOMAIN.workers.dev
 ```
 
 打开这个网址测试：
