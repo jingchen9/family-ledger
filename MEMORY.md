@@ -1,7 +1,7 @@
 # family-ledger-template Memory
 
 > Initialized: 2026-06-30
-> Last reviewed: 2026-06-30
+> Last reviewed: 2026-07-01
 
 ## Project Identity
 
@@ -24,6 +24,9 @@ Record non-obvious failure modes and the proven way to avoid or diagnose them.
 | Date | Pitfall | Resolution |
 | --- | --- | --- |
 | 2026-06-30 | Public template repos can accidentally leak private data or credentials through copied env files, workbooks, backups, or build outputs. | Keep README and project rules explicit: never commit `.env.local`, personal ledgers, migration bundles, exported backups, `dist/`, or `outputs/`. |
+| 2026-07-01 | Windows PowerShell can fail on `npm -v` because `npm.ps1` is blocked by execution policy. | In Windows docs prefer `npm.cmd -v`; if users need `npm -v`, set CurrentUser execution policy to RemoteSigned. |
+| 2026-07-01 | Some Windows machines cannot start the local launcher without Microsoft Visual C++ Redistributable. | Check/install VC++ Redistributable 2015-2022 x64 and x86 before running the ledger launcher. |
+| 2026-07-01 | Supabase first-time email flow may send `Confirm sign up` before normal OTP. | Document first-account activation separately from day-to-day Magic Link/OTP code login. |
 
 ## User Corrections
 
@@ -34,6 +37,7 @@ Record corrections that should change future behavior in this project.
 | 2026-06-30 | Node.js setup docs should distinguish macOS and Windows and include command-line installation options. | When documenting first-time setup, provide OS-specific GUI and CLI paths instead of one generic install sentence. |
 | 2026-06-30 | Cloudflare docs need a first-time setup path, not only `wrangler login` and deploy. | Explain Cloudflare account setup, Wrangler authorization, workers.dev subdomain, Worker naming, first deploy checks, redeploys, and optional custom domains. |
 | 2026-06-30 | Supabase default email sending should not be documented as enough for real OTP login on the free setup. | Treat custom SMTP, typically Gmail SMTP for this family template, as required for stable验证码登录; clarify that the Supabase project can be free but default email should not be relied on. |
+| 2026-07-01 | Supabase dashboard may not show a field literally named Project URL in the old location. | Tell users to find Project ID/Reference ID in Project Settings and construct `https://PROJECT_ID.supabase.co`, with Data API/API URL as an alternate location. |
 
 ## External Resources
 
