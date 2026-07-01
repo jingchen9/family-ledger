@@ -20,7 +20,7 @@
 | 服务 | 地址 | 用来做什么 |
 | --- | --- | --- |
 | GitHub | [github.com](https://github.com) | fork 这个模板，保存你自己的代码副本 |
-| Supabase | [supabase.com](https://supabase.com) | 保存账本数据，发送登录验证码 |
+| Supabase | [supabase.com](https://supabase.com) | 保存账本数据，生成登录验证码 |
 | Cloudflare | [dash.cloudflare.com](https://dash.cloudflare.com) | 部署网页，让手机和电脑都能访问 |
 | Gmail / Google 账号 | [myaccount.google.com](https://myaccount.google.com) | 用自己的 Gmail SMTP 发送验证码 |
 
@@ -242,16 +242,16 @@ http://localhost:5173
 
 跑完后，数据库会有家庭、成员、类别、汇率、交易记录等表，并启用 RLS 权限控制。用户只能看到自己所属家庭的数据。
 
-### 3. 配置 Supabase 登录验证码
+### 3. 配置 Supabase Auth 邮箱验证码
 
-这个项目使用邮箱验证码登录，不需要密码。登录流程是：
+这个项目使用邮箱验证码登录，不需要密码。验证码由 Supabase Auth 生成，但邮件要通过你配置的 Gmail SMTP 发出；不要依赖 Supabase 默认发信服务。登录流程是：
 
 1. 用户输入邮箱。
-2. Supabase 发验证码。
+2. Supabase Auth 生成验证码，并通过 Gmail SMTP 发送邮件。
 3. 用户回到账本页面输入验证码。
 4. 登录成功。
 
-在 Supabase 后台检查两个邮件模板：
+在 Supabase 后台检查两个邮件模板。这里先设置模板，下一步再配置 Gmail SMTP 发信：
 
 1. 打开 `Authentication` -> `Sign In / Providers`。
 2. 确认 Email provider 是开启状态。
