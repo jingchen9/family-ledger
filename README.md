@@ -658,6 +658,41 @@ npm install
 npm run build
 ```
 
+### Windows 更新手机端网页
+
+如果只是把 GitHub 上的新版本发布到 iPhone/手机端，按这个流程：
+
+1. 打开 GitHub Desktop。
+2. 选择自己的账本仓库。
+3. 点击 `Fetch origin`。
+4. 如果出现更新，点击 `Pull origin`。
+5. 打开 PowerShell。
+6. 进入项目目录，例如：
+
+```powershell
+cd C:\Users\你的用户名\Documents\GitHub\family-ledger
+```
+
+7. 如果这次更新改了依赖，先运行：
+
+```powershell
+npm install
+```
+
+8. 发布到 Cloudflare：
+
+```powershell
+npm run deploy
+```
+
+部署完成后，iPhone 或其他手机打开原来的 Cloudflare 网址就是新版。如果还是旧版，关闭主屏幕 App 后重新打开，或用 Safari 打开 Cloudflare 网址刷新一次；必要时等 1 分钟。
+
+注意：
+
+- 命令是 `npm run deploy`，不是 `depoly`。
+- 这台 Windows 电脑需要已经运行过 `npx wrangler login`，并且 `npx wrangler whoami` 能看到 Cloudflare 账号。
+- `wrangler.jsonc` 里的 `"name"` 要保持自己的 Worker 名称，不要改回模板名。
+
 如果新版包含新的 SQL 文件：
 
 1. 打开 `supabase/migrations/`。

@@ -40,6 +40,7 @@ Record corrections that should change future behavior in this project.
 | 2026-07-01 | Supabase dashboard may not show a field literally named Project URL in the old location. | Tell users to find Project ID/Reference ID in Project Settings and construct `https://PROJECT_ID.supabase.co`, with Data API/API URL as an alternate location. |
 | 2026-07-01 | Avoid wording that says "Supabase sends the verification code" without mentioning Gmail/custom SMTP. | Describe the actual flow as Supabase Auth generates the code and Gmail/custom SMTP sends the email. |
 | 2026-07-01 | Cloudflare first setup should include verifying Wrangler login before deployment. | Document `npx wrangler login`, `npx wrangler whoami`, editing `wrangler.jsonc`, deploying, and finding the final URL in Workers & Pages. |
+| 2026-07-04 | Friend-facing update docs should explain Windows GitHub Desktop to Cloudflare redeploy flow. | Tell users to Fetch/Pull in GitHub Desktop, `cd` to the project, optionally `npm install`, then run `npm run deploy` to update the phone web app. |
 
 ## External Resources
 
