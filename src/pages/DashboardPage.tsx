@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type SyntheticEvent, useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -35,6 +35,21 @@ interface BarLabelProps {
   index?: unknown;
 }
 
+interface ChartTooltipProps {
+  active?: boolean;
+  label?: unknown;
+  payload?: Array<{
+    name?: unknown;
+    value?: unknown;
+    color?: string;
+    payload?: Record<string, unknown>;
+  }>;
+  hiddenKey: string | null;
+  title: string;
+  formatValue(value: unknown, name?: unknown): string;
+  onClose(key: string): void;
+}
+
 function niceAxisMax(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 100;
   const padded = value * 1.16;
@@ -63,11 +78,53 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
+function tooltipKey(label: unknown, payload?: ChartTooltipProps["payload"]): string {
+  const firstPayload = payload?.[0]?.payload;
+  return String(firstPayload?.name ?? label ?? "");
+}
+
+function ChartTooltip({ active, label, payload, hiddenKey, title, formatValue, onClose }: ChartTooltipProps) {
+  const key = tooltipKey(label, payload);
+  if (!active || !payload?.length || key === hiddenKey) return null;
+  const stopTooltipEvent = (event: SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  return (
+    <div className="chart-tooltip" onPointerDown={stopTooltipEvent} onClick={stopTooltipEvent}>
+      <div className="chart-tooltip-head">
+        <strong>{key || title}</strong>
+        <button
+          type="button"
+          aria-label="关闭图表提示"
+          onPointerDown={stopTooltipEvent}
+          onMouseDown={stopTooltipEvent}
+          onClick={(event) => {
+            stopTooltipEvent(event);
+            onClose(key);
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <span>{title}</span>
+      {payload.map((item, index) => (
+        <div className="chart-tooltip-row" key={`${String(item.name)}-${index}`}>
+          <i style={{ background: item.color }} />
+          <small>{String(item.name ?? "数值")}</small>
+          <b>{formatValue(item.value, item.name)}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DashboardPage({ month, onMonthChange }: DashboardPageProps) {
   const { transactions, categories, exchangeRates } = useLedger();
   const [analysisCurrency, setAnalysisCurrency] = useState<AnalysisCurrency>("EUR");
   const [analysisScope, setAnalysisScope] = useState<AnalysisScope>("all_cash");
   const [showDefinitions, setShowDefinitions] = useState(false);
+  const [hiddenTooltipKey, setHiddenTooltipKey] = useState<string | null>(null);
   const isNarrowChart = useMediaQuery("(max-width: 640px)");
   const year = month.slice(0, 4);
   const displayCurrency: Currency = analysisCurrency === "CNY" ? "CNY" : "EUR";
@@ -123,9 +180,9 @@ export function DashboardPage({ month, onMonthChange }: DashboardPageProps) {
     [categoryData],
   );
   const categoryChartMargin = isNarrowChart
-    ? { left: 78, right: 0, top: 4, bottom: 4 }
-    : { left: 94, right: 6, top: 4, bottom: 4 };
-  const categoryAxisWidth = isNarrowChart ? 68 : 76;
+    ? { left: 58, right: 0, top: 4, bottom: 4 }
+    : { left: 64, right: 0, top: 4, bottom: 4 };
+  const categoryAxisWidth = isNarrowChart ? 62 : 70;
   const categoryTickFontSize = isNarrowChart ? 11 : 12;
   const chartTickStyle = { fontSize: categoryTickFontSize, fontFamily: "inherit" };
   const renderCategoryBarLabel = ({ x, y, width, height, value, index }: BarLabelProps) => {
@@ -280,11 +337,17 @@ export function DashboardPage({ month, onMonthChange }: DashboardPageProps) {
 
       <div className="chart-grid">
         <section className="surface chart-card">
-          <div className="section-title"><div><p className="eyebrow">支出去向</p><h2>分类支出金额</h2></div></div>
+          <div className="section-title">
+            <div>
+              <p className="eyebrow">支出去向</p>
+              <h2>分类支出金额</h2>
+              <span>{analysisNoun}月支出（含均摊）</span>
+            </div>
+          </div>
           {categoryData.length === 0 ? (
             <div className="empty-chart">本月有支出后，这里会显示分类占比。</div>
           ) : (
-            <ResponsiveContainer width="100%" height={categoryChartHeight}>
+            <ResponsiveContainer className="category-chart-container" width="100%" height={categoryChartHeight}>
               <BarChart data={categoryChartData} layout="vertical" margin={categoryChartMargin}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e8e3d8" />
                 <XAxis
@@ -305,8 +368,19 @@ export function DashboardPage({ month, onMonthChange }: DashboardPageProps) {
                   tick={chartTickStyle}
                   tickLine={false}
                 />
-                <Tooltip formatter={(value) => [expenseMoney(Math.abs(Number(value))), "支出"]} />
-                <Bar dataKey="expenseValue" radius={[0, 8, 8, 0]}>
+                <Tooltip
+                  cursor={{ fill: "rgba(30, 54, 47, 0.05)" }}
+                  wrapperStyle={{ pointerEvents: "auto" }}
+                  content={(
+                    <ChartTooltip
+                      hiddenKey={hiddenTooltipKey}
+                      title="分类支出（含均摊）"
+                      formatValue={(value) => expenseMoney(Math.abs(Number(value)))}
+                      onClose={setHiddenTooltipKey}
+                    />
+                  )}
+                />
+                <Bar dataKey="expenseValue" name="金额" radius={[0, 8, 8, 0]}>
                   <LabelList dataKey="expenseValue" content={renderCategoryBarLabel} />
                   {categoryChartData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
                 </Bar>
@@ -322,7 +396,17 @@ export function DashboardPage({ month, onMonthChange }: DashboardPageProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="#e8e3d8" />
               <XAxis dataKey="month" interval={0} tick={chartTickStyle} />
               <YAxis tickFormatter={signedAxisMoney} width={68} allowDecimals={false} tick={chartTickStyle} />
-              <Tooltip formatter={trendTooltip} />
+              <Tooltip
+                wrapperStyle={{ pointerEvents: "auto" }}
+                content={(
+                  <ChartTooltip
+                    hiddenKey={hiddenTooltipKey}
+                    title="每月收支结余"
+                    formatValue={(value, name) => trendTooltip(value, name)[0]}
+                    onClose={setHiddenTooltipKey}
+                  />
+                )}
+              />
               <Legend
                 verticalAlign="top"
                 align="right"

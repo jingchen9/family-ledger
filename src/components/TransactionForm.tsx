@@ -110,7 +110,9 @@ export function TransactionForm({
   const businessType = selectedCategory ? inferBusinessType(selectedCategory.name) : initial?.businessType ?? "daily";
   const billedNumeric = parseDecimalInput(billedAmount);
   const rateNumeric = parseDecimalInput(transactionRate);
-  const computedCnyAmount = foreignPriced && billedNumeric > 0 && rateNumeric > 0
+  const canUseSpecialRate = direction === "expense" && currency === "CNY";
+  const usesSpecialRate = canUseSpecialRate && foreignPriced;
+  const computedCnyAmount = usesSpecialRate && billedNumeric > 0 && rateNumeric > 0
     ? Number((billedNumeric * rateNumeric).toFixed(2))
     : null;
   const displayedAmount = computedCnyAmount === null ? amount : computedCnyAmount.toFixed(2);
@@ -131,7 +133,10 @@ export function TransactionForm({
 
   function changeDirection(nextDirection: Exclude<Direction, "neutral">) {
     setDirection(nextDirection);
-    if (nextDirection === "income") setFixedEntry(false);
+    if (nextDirection === "income") {
+      setFixedEntry(false);
+      setForeignPriced(false);
+    }
     const firstCategory = categories.find((category) => category.direction === nextDirection);
     setCategoryId(firstCategory?.id ?? "");
   }
@@ -150,6 +155,7 @@ export function TransactionForm({
   }
 
   function changeAmountMode(nextForeignPriced: boolean) {
+    if (nextForeignPriced && !canUseSpecialRate) return;
     setForeignPriced(nextForeignPriced);
     if (nextForeignPriced) {
       setCurrency("CNY");
@@ -161,10 +167,10 @@ export function TransactionForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
-    const numericAmount = foreignPriced ? computedCnyAmount ?? Number.NaN : parseDecimalInput(amount);
+    const numericAmount = usesSpecialRate ? computedCnyAmount ?? Number.NaN : parseDecimalInput(amount);
     if (!selectedCategoryId) return setError("请选择类别");
-    if (foreignPriced && (!Number.isFinite(billedNumeric) || billedNumeric <= 0)) return setError("请输入大于 0 的账单金额");
-    if (foreignPriced && (!Number.isFinite(rateNumeric) || rateNumeric <= 0)) return setError("请输入大于 0 的当笔汇率");
+    if (usesSpecialRate && (!Number.isFinite(billedNumeric) || billedNumeric <= 0)) return setError("请输入大于 0 的账单金额");
+    if (usesSpecialRate && (!Number.isFinite(rateNumeric) || rateNumeric <= 0)) return setError("请输入大于 0 的当笔汇率");
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setError("请输入大于 0 的金额");
     if (fixedEntry && !initial && fixedMonths.length === 0) return setError("结束月份不能早于开始月份");
     if (fixedEntry && initial && applyFutureFixed && futureFixedMonths.length === 0) {
@@ -183,9 +189,9 @@ export function TransactionForm({
       categoryId: selectedCategoryId,
       amount: numericAmount,
       currency,
-      exchangeRate: foreignPriced ? rateNumeric : null,
-      billedAmount: foreignPriced ? billedNumeric : null,
-      billedCurrency: foreignPriced ? "EUR" : null,
+      exchangeRate: usesSpecialRate ? rateNumeric : null,
+      billedAmount: usesSpecialRate ? billedNumeric : null,
+      billedCurrency: usesSpecialRate ? "EUR" : null,
       detail: detail.trim(),
       businessType,
       isFixed: allocation || fixedEntry,
@@ -343,7 +349,7 @@ export function TransactionForm({
             type="button"
             className={currency === "EUR" ? "active" : ""}
             onClick={() => setCurrency("EUR")}
-            disabled={foreignPriced}
+            disabled={usesSpecialRate}
           >
             EUR 欧元
           </button>
@@ -357,27 +363,29 @@ export function TransactionForm({
         </div>
       </fieldset>
 
-      <fieldset className="segmented-field amount-mode-field">
-        <legend>金额模式</legend>
-        <div className="segmented-control amount-mode-control">
-          <button
-            type="button"
-            className={!foreignPriced ? "active" : ""}
-            onClick={() => changeAmountMode(false)}
-          >
-            普通金额
-          </button>
-          <button
-            type="button"
-            className={foreignPriced ? "active" : ""}
-            onClick={() => changeAmountMode(true)}
-          >
-            外币标价
-          </button>
-        </div>
-      </fieldset>
+      {canUseSpecialRate && (
+        <fieldset className="segmented-field amount-mode-field">
+          <legend>金额模式</legend>
+          <div className="segmented-control amount-mode-control">
+            <button
+              type="button"
+              className={!foreignPriced ? "active" : ""}
+              onClick={() => changeAmountMode(false)}
+            >
+              普通金额
+            </button>
+            <button
+              type="button"
+              className={foreignPriced ? "active" : ""}
+              onClick={() => changeAmountMode(true)}
+            >
+              特殊汇率
+            </button>
+          </div>
+        </fieldset>
+      )}
 
-      {foreignPriced && (
+      {usesSpecialRate && (
         <div className="foreign-price-panel">
           <div className="form-grid three-columns">
             <label>
@@ -425,7 +433,6 @@ export function TransactionForm({
           onChange={(event) => setAmount(cleanDecimalInput(event.target.value))}
           readOnly={foreignPriced}
           required
-          autoFocus={!initial}
           aria-label={foreignPriced ? "实际扣款" : "金额"}
         />
       </div>

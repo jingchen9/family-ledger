@@ -80,6 +80,7 @@ export function SettingsPage() {
   const [rateValue, setRateValue] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [showChangelog, setShowChangelog] = useState(false);
 
   const currentHousehold = households.find((household) => household.id === householdId);
   const canManageHousehold = mode === "supabase" && currentHousehold?.role === "owner";
@@ -96,6 +97,8 @@ export function SettingsPage() {
     }
     return counts;
   }, [transactions]);
+  const editingCategory = visibleCategories.find((category) => category.id === editingCategoryId) ?? null;
+  const editingCategoryUsage = editingCategory ? categoryUsage.get(editingCategory.id) ?? 0 : 0;
 
   async function submitCategory(event: FormEvent) {
     event.preventDefault();
@@ -126,7 +129,6 @@ export function SettingsPage() {
       color: editingCategoryColor,
       active: editingCategoryActive,
     });
-    cancelEditCategory();
   }
 
   async function removeCategory(category: Category) {
@@ -406,69 +408,83 @@ export function SettingsPage() {
 
         <section className="surface settings-card">
           <div className="section-title"><h2>类别管理</h2><span>{categories.length} 个类别</span></div>
-          <form onSubmit={submitCategory} className="inline-form">
-            <select value={categoryDirection} onChange={(event) => setCategoryDirection(event.target.value as "income" | "expense")}>
-              <option value="expense">支出</option>
-              <option value="income">收入</option>
-            </select>
-            <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="类别名称" required />
-            <button className="secondary-button" disabled={busy}>添加</button>
-          </form>
-          <div className="category-list">
-            {visibleCategories.map((category) => {
-              const usageCount = categoryUsage.get(category.id) ?? 0;
-              const editing = editingCategoryId === category.id;
-              return (
-                <div className="category-row" key={category.id}>
-                  {editing ? (
-                    <form className="category-edit-form" onSubmit={submitCategoryEdit}>
-                      <input
-                        type="color"
-                        value={editingCategoryColor}
-                        onChange={(event) => setEditingCategoryColor(event.target.value)}
-                        aria-label="类别颜色"
-                      />
-                      <input
-                        value={editingCategoryName}
-                        onChange={(event) => setEditingCategoryName(event.target.value)}
-                        required
-                      />
-                      <label className="checkbox-line">
-                        <input
-                          type="checkbox"
-                          checked={editingCategoryActive}
-                          onChange={(event) => setEditingCategoryActive(event.target.checked)}
-                        />
-                        新记账可选
-                      </label>
-                      <button className="secondary-button" disabled={busy}>保存</button>
-                      <button className="ghost-button" type="button" onClick={cancelEditCategory}>取消</button>
-                    </form>
-                  ) : (
-                    <>
-                      <span className="category-name">
-                        <i style={{ background: category.color }} />
-                        <strong>{category.name}</strong>
-                        {!category.active && <small>已停用</small>}
-                      </span>
-                      <span className="category-usage">
-                        {usageCount > 0 ? `已使用 ${usageCount} 笔` : "未使用"}
-                      </span>
-                      <div className="category-actions">
-                        <button className="ghost-button" type="button" onClick={() => startEditCategory(category)}>
-                          编辑
-                        </button>
-                        {usageCount === 0 ? (
-                          <button className="danger-button" type="button" onClick={() => removeCategory(category)}>
-                            删除
-                          </button>
-                        ) : null}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+          <div className="category-manager">
+            <div className="category-panel">
+              <h3>添加新类别</h3>
+              <form onSubmit={submitCategory} className="inline-form">
+                <select
+                  value={categoryDirection}
+                  onChange={(event) => {
+                    setCategoryDirection(event.target.value as "income" | "expense");
+                    cancelEditCategory();
+                  }}
+                >
+                  <option value="expense">支出</option>
+                  <option value="income">收入</option>
+                </select>
+                <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="类别名称" required />
+                <button className="secondary-button" disabled={busy}>添加</button>
+              </form>
+            </div>
+
+            <div className="category-panel">
+              <h3>编辑旧类别</h3>
+              <label>
+                选择类别
+                <select
+                  value={editingCategory?.id ?? ""}
+                  onChange={(event) => {
+                    const category = visibleCategories.find((item) => item.id === event.target.value);
+                    if (category) startEditCategory(category);
+                    else cancelEditCategory();
+                  }}
+                >
+                  <option value="">选择要编辑的类别</option>
+                  {visibleCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}{category.active ? "" : "（已停用）"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {editingCategory ? (
+                <form className="category-edit-form" onSubmit={submitCategoryEdit}>
+                  <input
+                    type="color"
+                    value={editingCategoryColor}
+                    onChange={(event) => setEditingCategoryColor(event.target.value)}
+                    aria-label="类别颜色"
+                  />
+                  <input
+                    value={editingCategoryName}
+                    onChange={(event) => setEditingCategoryName(event.target.value)}
+                    required
+                  />
+                  <label className="checkbox-line">
+                    <input
+                      type="checkbox"
+                      checked={editingCategoryActive}
+                      onChange={(event) => setEditingCategoryActive(event.target.checked)}
+                    />
+                    新记账可选
+                  </label>
+                  <span className="category-usage">
+                    {editingCategoryUsage > 0 ? `已使用 ${editingCategoryUsage} 笔` : "未使用，可以删除"}
+                  </span>
+                  <div className="category-actions">
+                    <button className="secondary-button" disabled={busy}>保存</button>
+                    {editingCategoryUsage === 0 ? (
+                      <button className="danger-button" type="button" onClick={() => removeCategory(editingCategory)}>
+                        删除
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              ) : (
+                <p className="muted">选择一个类别后，可以改名、换颜色或停用。</p>
+              )}
+            </div>
           </div>
         </section>
 
@@ -489,6 +505,40 @@ export function SettingsPage() {
             <input type="file" accept="application/json,.json" onChange={importMigration} disabled={busy} />
           </label>
           {importStatus && <p className="muted">{importStatus}</p>}
+        </section>
+
+        <section className="surface settings-card backup-card changelog-card">
+          <div className="section-title">
+            <div>
+              <h2>更新日志</h2>
+              <span>最近更新：2026/07/04</span>
+            </div>
+            <button type="button" className="ghost-button" onClick={() => setShowChangelog((value) => !value)}>
+              {showChangelog ? "收起" : "展开"}
+            </button>
+          </div>
+          {showChangelog && (
+            <>
+              <div className="changelog-entry">
+                <p className="eyebrow">更新</p>
+                <ul>
+                  <li>月末均摊明细显示原始支付日期，并可直接编辑或删除源记录。</li>
+                  <li>类别管理改为“添加新类别”和“编辑旧类别”两块；旧类别通过下拉选择后再编辑。</li>
+                  <li>记一笔金额模式里的“外币标价”改名为“特殊汇率”。</li>
+                  <li>分析页“支出去向”改为按月支出（含均摊）展示分类金额。</li>
+                </ul>
+              </div>
+              <div className="changelog-entry">
+                <p className="eyebrow">修复</p>
+                <ul>
+                  <li>切换支出/收入或记账类型时，不再自动跳到金额输入框。</li>
+                  <li>补充均摊支出回归测试，避免实际付款和均摊金额在账本月支出里重复计算。</li>
+                  <li>分析图表提示改为半透明浮层，并增加关闭按钮。</li>
+                  <li>修正支出去向图表提示里的字段名，不再显示内部字段 <code>expenseValue</code>。</li>
+                </ul>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </div>
