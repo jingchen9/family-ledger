@@ -203,12 +203,12 @@ export function categoryExpenseData(
   conversionRates: ConversionRates = {},
 ): Array<{ name: string; value: number; color: string }> {
   const totals = new Map<string, number>();
-  for (const transaction of transactionsForMonth(transactions, month)) {
-    const value = valueForCurrency(transaction, analysisCurrency, conversionRates);
-    if (transaction.direction !== "expense" || value === null || !isIncludedInAnalysis(transaction, analysisScope)) {
+  for (const transaction of transactions) {
+    if (transaction.direction !== "expense" || !isIncludedInAnalysis(transaction, analysisScope)) {
       continue;
     }
-    totals.set(transaction.categoryId, (totals.get(transaction.categoryId) ?? 0) + value);
+    const value = allocatedAmountForMonth(transaction, month, analysisCurrency, conversionRates);
+    if (value > 0) totals.set(transaction.categoryId, (totals.get(transaction.categoryId) ?? 0) + value);
   }
   return categories
     .map((category) => ({

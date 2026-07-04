@@ -113,6 +113,7 @@ export function MonthPage({ month, onMonthChange }: MonthPageProps) {
           </div>
           <TransactionForm
             initial={editing}
+            allocation={Boolean(editing.allocationStartMonth && editing.allocationMonths)}
             fixed={isMonthlyFixedCashCommitment(editing)}
             onSaved={() => setEditing(null)}
             onCancel={() => setEditing(null)}
@@ -217,11 +218,15 @@ export function MonthPage({ month, onMonthChange }: MonthPageProps) {
                   <strong>{cleanMigrationNote(transaction.detail) || category?.name || "未分类"}</strong>
                   <span>
                     {category?.name} · 原始 {formatMoney(transaction.amount, transaction.currency)}
+                    {` · 支付 ${formatDate(transaction.date)}`}
                     {transaction.allocationMonths ? ` / ${transaction.allocationMonths} 个月` : ""}
                   </span>
                 </div>
                 <strong className="money expense-text">-{formatMoney(amount, transaction.currency)}</strong>
-                <div className="row-actions allocation-note">规则</div>
+                <div className="row-actions">
+                  <button onClick={() => setEditing(transaction)}>编辑</button>
+                  <button onClick={() => void remove(transaction)}>删除</button>
+                </div>
               </article>
             );
           })
